@@ -1,0 +1,198 @@
+import yfinance as yf
+import pandas as pd
+import os
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
+from datetime import datetime, timedelta
+import numpy as np
+import sys
+
+# Seaborn import with error handling
+try:
+    import seaborn as sns
+    print("Seaborn imported successfully")
+except ImportError:
+    print("Seaborn not found. Installing...")
+    import subprocess
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "seaborn"])
+    import seaborn as sns
+
+def fetch_market_data(tickers, market, years=3):
+    """Fetch historical market data with robust error handling"""
+    end_date = datetime.today()
+    start_date = end_date - timedelta(days=365 * years)
+    
+    print(f"\n{'='*50}")
+    print(f"Fetching {market} data for {tickers}...")
+    print(f"Date range: {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}")
+    
+    try:
+        data = yf.download(
+            tickers,
+            start=start_date,
+            end=end_date,
+            group_by='ticker',
+            progress=True,
+            threads=True
+        )
+        
+        if data.empty:
+            raise ValueError("No data returned from Yahoo Finance")
+            
+        return data
+        
+    except Exception as e:
+        print(f"⚠️ Error fetching {market} data: {str(e)}")
+        print("Trying fallback method with shorter period...")
+        try:
+            data = yf.download(
+                tickers,
+                period=f"{years}y",
+                progress=True,
+                threads=True
+            )
+            return data
+        except:
+            print(f"❌ Critical error fetching {tickers}")
+            return None
+
+def save_and_visualize(data, market, tickers):
+    """Save data and create visualizations"""
+    if data is None:
+        print("Skipping visualization - no data available")
+        return
+        
+    # Create market directory
+    market_dir = f"data/{market.lower()}"
+    os.makedirs(market_dir, exist_ok=True)
+    
+    # Handle single vs multiple tickers
+    if len(tickers) == 1:
+        ticker = tickers[0]
+        data.to_csv(f"{market_dir}/{ticker}.csv")
+        print(f"✅ Saved {ticker} data ({len(data)} records)")
+    else:
+        for ticker in tickers:
+            try:
+                if ticker in data.columns.get_level_values(0):
+                    ticker_data = data[ticker]
+                    ticker_data.to_csv(f"{market_dir}/{ticker}.csv")
+                    print(f"✅ Saved {ticker} data ({len(ticker_data)} records)")
+                else:
+                    print(f"⚠️ Ticker {ticker} not found in data")
+            except Exception as e:
+                print(f"❌ Error saving {ticker}: {str(e)}")
+    
+    # Visualization
+    create_visualization(data, market, tickers)
+
+def create_visualization(data, market, tickers):
+    """Create comprehensive visualizations of market data"""
+    plt.figure(figsize=(14, 10))
+    plt.suptitle(f"{market} Market Analysis", fontsize=16, y=0.98)
+    
+    # 1. Price Trends
+    ax1 = plt.subplot(2, 2, 1)
+    for ticker in tickers:
+        try:
+            if len(tickers) == 1:
+                close_prices = data['Close']
+            else:
+                close_prices = data[ticker]['Close']
+                
+            plt.plot(close_prices, label=ticker, alpha=0.8)
+        except:
+            continue
+            
+    plt.title('Price Trends')
+    plt.xlabel('Date')
+    plt.ylabel('Price (USD)')
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+    plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y'))
+    
+    # 2. Daily Returns Distribution
+    ax2 = plt.subplot(2, 2, 2)
+    for ticker in tickers:
+        try:
+            if len(tickers) == 1:
+                returns = data['Close'].pct_change().dropna()
+            else:
+                returns = data[ticker]['Close'].pct_change().dropna()
+                
+            sns.histplot(returns, kde=True, label=ticker, alpha=0.5, bins=50)
+        except:
+            continue
+            
+    plt.title('Daily Returns Distribution')
+    plt.xlabel('Daily Return')
+    plt.ylabel('Frequency')
+    plt.legend()
+    
+    # 3. Volatility Analysis
+    ax3 = plt.subplot(2, 2, 3)
+    for ticker in tickers:
+        try:
+            if len(tickers) == 1:
+                volatility = data['Close'].pct_change().rolling(30).std() * np.sqrt(252)
+            else:
+                volatility = data[ticker]['Close'].pct_change().rolling(30).std() * np.sqrt(252)
+                
+            plt.plot(volatility, label=ticker)
+        except:
+            continue
+            
+    plt.title('Annualized Volatility (30-day rolling)')
+    plt.xlabel('Date')
+    plt.ylabel('Volatility')
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+    
+    # 4. Correlation Matrix (only if multiple tickers)
+    ax4 = plt.subplot(2, 2, 4)
+    if len(tickers) > 1:
+        try:
+            closes = pd.DataFrame()
+            for ticker in tickers:
+                if ticker in data.columns.get_level_values(0):
+                    closes[ticker] = data[ticker]['Close']
+            
+            corr = closes.corr()
+            sns.heatmap(corr, annot=True, cmap='coolwarm', vmin=-1, vmax=1, fmt=".2f")
+            plt.title('Correlation Matrix')
+        except Exception as e:
+            print(f"⚠️ Could not create correlation matrix: {str(e)}")
+            plt.text(0.5, 0.5, "Correlation data unavailable", 
+                     ha='center', va='center')
+    else:
+        plt.text(0.5, 0.5, "Correlation requires multiple tickers", 
+                 ha='center', va='center')
+    
+    plt.tight_layout(rect=[0, 0, 1, 0.96])
+    plt.savefig(f'data/{market}_market_analysis.png', dpi=120)
+    print(f"📊 Visualization saved as data/{market}_market_analysis.png")
+    plt.close()
+
+if __name__ == "__main__":
+    # Ensure data directory exists
+    os.makedirs("data", exist_ok=True)
+    
+    # US Markets
+    us_tickers = ['SPY', 'QQQ', 'VXX', 'TLT']
+    us_data = fetch_market_data(us_tickers, 'US', years=3)
+    save_and_visualize(us_data, 'US', us_tickers)
+    
+    # Asian Markets
+    asia_tickers = ['^HSI', '^N225', 'EWT', 'EWY']  # Hong Kong, Japan, Taiwan, Korea
+    asia_data = fetch_market_data(asia_tickers, 'Asia', years=3)
+    save_and_visualize(asia_data, 'Asia', asia_tickers)
+    
+    # Print completion message
+    print("\n" + "="*50)
+    print("✅ DATA COLLECTION COMPLETE")
+    print("="*50)
+    print("Created files:")
+    print(f"- US market data: data/us/")
+    print(f"- Asia market data: data/asia/")
+    print(f"- Visualizations: data/US_market_analysis.png")
+    print(f"                data/Asia_market_analysis.png")

@@ -1,0 +1,11 @@
+from alpaca_trade_api import REST
+
+def live_trade():
+    api = REST(
+        key_id=os.getenv('ALPACA_KEY'),
+        secret_key=os.getenv('ALPACA_SECRET'),
+        base_url='https://paper-api.alpaca.markets'
+    )
+    
+    # Implement your live trading logic here
+    # Use websockets for real-time data

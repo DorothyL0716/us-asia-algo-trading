@@ -1,0 +1,136 @@
+import pandas as pd
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
+import seaborn as sns
+import numpy as np
+from datetime import datetime, timedelta
+import os
+
+# Set professional style
+sns.set(style="whitegrid", palette="muted", font_scale=1.1)
+plt.rcParams['figure.figsize'] = (14, 10)
+plt.rcParams['axes.grid'] = True
+plt.rcParams['grid.alpha'] = 0.3
+
+def visualize_market_synergy():
+    try:
+        # Load US market data
+        us_data = pd.read_csv('data/us/SPY.csv', index_col=0, parse_dates=True)
+        us_data = us_data[['Close']].rename(columns={'Close': 'SPY'})
+        
+        # Load Asian market data (Hong Kong)
+        asia_data = pd.read_csv('data/asia/^HSI.csv', index_col=0, parse_dates=True)
+        asia_data = asia_data[['Close']].rename(columns={'Close': 'HSI'})
+        
+        # Align timezones and merge
+        merged = pd.merge(us_data, asia_data, left_index=True, right_index=True, how='inner')
+        
+        # Normalize prices for comparison
+        merged['SPY_norm'] = merged['SPY'] / merged['SPY'].iloc[0] * 100
+        merged['HSI_norm'] = merged['HSI'] / merged['HSI'].iloc[0] * 100
+        
+        # Calculate daily returns
+        merged['SPY_ret'] = merged['SPY'].pct_change()
+        merged['HSI_ret'] = merged['HSI'].pct_change()
+        
+        # Calculate rolling correlation (30-day window)
+        merged['Rolling_Corr'] = merged['SPY_ret'].rolling(window=30).corr(merged['HSI_ret'])
+        
+        # Create figure
+        fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(14, 12))
+        
+        # 1. Normalized Price Comparison
+        ax1.plot(merged.index, merged['SPY_norm'], label='S&P 500 (US)', color='#2e7d32', linewidth=2)
+        ax1.plot(merged.index, merged['HSI_norm'], label='Hang Seng (Asia)', color='#1565c0', linewidth=2)
+        ax1.set_title('US-Asia Market Synergy: Normalized Price Comparison', fontsize=16, pad=15)
+        ax1.set_ylabel('Normalized Price (Base=100)', fontsize=12)
+        ax1.legend(loc='upper left')
+        ax1.xaxis.set_major_formatter(mdates.DateFormatter('%b %Y'))
+        
+        # Add synergy zone shading
+        min_date = merged.index.min()
+        max_date = merged.index.max()
+        ax1.fill_between(merged.index, merged['SPY_norm'], merged['HSI_norm'], 
+                         where=merged['SPY_norm'] > merged['HSI_norm'], 
+                         color='#2e7d32', alpha=0.1, interpolate=True)
+        ax1.fill_between(merged.index, merged['SPY_norm'], merged['HSI_norm'], 
+                         where=merged['SPY_norm'] <= merged['HSI_norm'], 
+                         color='#1565c0', alpha=0.1, interpolate=True)
+        
+        # 2. Returns Correlation Scatter Plot
+        valid_returns = merged.dropna(subset=['SPY_ret', 'HSI_ret'])
+        sns.regplot(x='SPY_ret', y='HSI_ret', data=valid_returns, 
+                   ax=ax2, color='#6a1b9a', scatter_kws={'alpha':0.4, 's':20})
+        ax2.set_title('Daily Returns Correlation', fontsize=15, pad=10)
+        ax2.set_xlabel('S&P 500 Daily Returns', fontsize=12)
+        ax2.set_ylabel('Hang Seng Daily Returns', fontsize=12)
+        
+        # Add correlation coefficient
+        corr_coef = valid_returns['SPY_ret'].corr(valid_returns['HSI_ret'])
+        ax2.text(0.05, 0.95, f'Correlation: {corr_coef:.3f}', 
+                transform=ax2.transAxes, fontsize=13,
+                bbox=dict(facecolor='white', alpha=0.8))
+        
+        # Add regression line equation
+        x = valid_returns['SPY_ret']
+        y = valid_returns['HSI_ret']
+        coeffs = np.polyfit(x, y, 1)
+        slope, intercept = coeffs
+        ax2.text(0.05, 0.85, f'HSI = {slope:.3f}*SPY + {intercept:.3f}', 
+                transform=ax2.transAxes, fontsize=12)
+        
+        # 3. Rolling Correlation
+        ax3.plot(merged.index, merged['Rolling_Corr'], color='#d32f2f', linewidth=2)
+        ax3.axhline(y=0, color='gray', linestyle='--', alpha=0.7)
+        ax3.set_title('30-Day Rolling Correlation', fontsize=15, pad=10)
+        ax3.set_xlabel('Date', fontsize=12)
+        ax3.set_ylabel('Correlation Coefficient', fontsize=12)
+        ax3.set_ylim([-1, 1])
+        ax3.xaxis.set_major_formatter(mdates.DateFormatter('%b %Y'))
+        
+        # Add significant events
+        covid_date = pd.Timestamp('2020-03-23')
+        ax3.axvline(x=covid_date, color='#ff9800', linestyle='--', alpha=0.8)
+        ax3.text(covid_date, 0.9, 'COVID Crash', fontsize=10, 
+                ha='right', color='#ff9800')
+        
+        # Formatting
+        plt.tight_layout(pad=3.0)
+        
+        # Save and show
+        os.makedirs("visualizations", exist_ok=True)
+        plt.savefig('visualizations/us_asia_market_synergy.png', dpi=150, bbox_inches='tight')
+        print("✅ Market synergy visualization saved to visualizations/us_asia_market_synergy.png")
+        plt.show()
+        
+        return corr_coef
+    
+    except FileNotFoundError as e:
+        print(f"⛔ Error: {str(e)}")
+        print("Please run data collection first to download market data")
+        return None
+    except Exception as e:
+        print(f"⛔ Unexpected error: {str(e)}")
+        return None
+
+if __name__ == "__main__":
+    print("Generating US-Asia Market Synergy Visualization...")
+    correlation = visualize_market_synergy()
+    
+    if correlation is not None:
+        print(f"\nMarket Correlation Analysis:")
+        print(f"S&P 500 vs Hang Seng Correlation: {correlation:.3f}")
+        
+        if correlation > 0.7:
+            print("✅ Strong positive correlation - Markets moving together")
+        elif correlation > 0.3:
+            print("➡️ Moderate positive correlation - Some synergy exists")
+        elif correlation > -0.3:
+            print("⚠️ Weak correlation - Markets mostly independent")
+        else:
+            print("↗️ Negative correlation - Markets often move opposite")
+        
+        print("\nKey Insights:")
+        print("- US and Asian markets show significant interdependence")
+        print("- Market crises (like COVID) increase correlation temporarily")
+        print("- Diversification benefits decrease when correlation > 0.7")
