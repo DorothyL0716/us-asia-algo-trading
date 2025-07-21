@@ -12,9 +12,11 @@ This project explores the relationship between US and Asian financial markets th
   
 1. Both markets have shown growth over the period, but the US market (S&P 500) has significantly outperformed the Asian market (Hang Seng):
   - The S&P 500 reached around 160 (a 60% increase from the starting point) by September 2025, while the Hang Seng only reached about 120 (a 20% increase) in the      same period.
+
 2. The US and Asian markets moved independently on a day-to-day basis during this period:
   - The S&P 500 reached around 160 (a 60% increase from the starting point) by September 2025, while the Hang Seng only reached about 120 (a 20% increase) in the      same period.
   - The correlation coefficient is 0.074, which is very low (close to zero). This means there is almost no linear relationship between the daily returns of the        two markets.
+
 3. the relationship between the two markets is not consistent:
   - The correlation has fluctuated between about -0.5 and 0.5, meaning sometimes the markets moved in the same direction (positive correlation) and sometimes in       opposite directions (negative correlation).
 
@@ -25,14 +27,16 @@ Price Trends
   - SPY and QQQ (representing stocks) have an upward trend, with QQQ growing more than SPY (as expected because QQQ is tech-heavy).
   - VXX (volatility) has been declining, meaning the market has become less volatile over time.
   - TLT (bonds) has been relatively flat or declining, which might be due to rising interest rates.
+
 Volatility
   - VXX (volatility index) has the highest volatility, which is expected because it's designed to measure market volatility.
   - SPY and QQQ have similar volatility patterns, but QQQ is slightly more volatile than SPY (common because tech stocks are more volatile).
   - TLT (bonds) has lower volatility than stocks but higher than what is typical for bonds because of the interest rate changes in this period.
+
 Correlation
   - SPY and QQQ are highly positively correlated (0.99). This means they tend to move together.
   - Both SPY and QQQ are negatively correlated with VXX (around -0.75 to -0.79). This is because when the stock market goes up, volatility usually goes down, and      vice versa.
-  - TLT (bonds) has a negative correlation with stocks (SPY and QQQ) but positive with VXX (volatility). This is typical because bonds are considered safer and tend to go up when stocks go down (and volatility goes up).
+  - TLT (bonds) has a negative correlation with stocks (SPY and QQQ) but positive with VXX (volatility). This is typical because bonds are considered safer and        tend to go up when stocks go down (and volatility goes up).
 
 ## Project Goals
 - To learn about financial data analysis and visualization.
